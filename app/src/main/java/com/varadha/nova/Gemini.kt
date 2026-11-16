@@ -66,7 +66,29 @@ object Gemini {
         return if (r.isNotBlank()) "Gemini didn't answer ($r)" else "Gemini sent an empty answer"
     }
 
+    /** Tries twice if the network blips (DNS / timeout), then gives a clear "no internet" message. */
     private fun request(method: String, url: String, key: String, body: JSONObject?): JSONObject {
+        var last: java.io.IOException? = null
+        repeat(2) { attempt ->
+            try {
+                return requestOnce(method, url, key, body)
+            } catch (e: java.net.UnknownHostException) {
+                last = e
+            } catch (e: java.net.SocketTimeoutException) {
+                last = e
+            } catch (e: java.net.ConnectException) {
+                last = e
+            }
+            if (attempt == 0) Thread.sleep(1500)
+        }
+        throw ApiError(
+            if (last is java.net.SocketTimeoutException) "Google took too long to answer. Check your internet and try again."
+            else "No internet connection: couldn't reach Google. Check mobile data or Wi-Fi for Nova.",
+            -1
+        )
+    }
+
+    private fun requestOnce(method: String, url: String, key: String, body: JSONObject?): JSONObject {
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = method
