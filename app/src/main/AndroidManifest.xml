@@ -100,6 +100,36 @@
             </intent-filter>
         </service>
 
+        <!-- Phone's assistant: long-press power opens Nova -->
+        <service
+            android:name=".NovaInteractionService"
+            android:exported="true"
+            android:label="Nova"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".NovaSessionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
+
+        <!-- Passes other apps' voice typing straight to Google -->
+        <service
+            android:name=".NovaRecognitionService"
+            android:exported="true"
+            android:label="Nova (uses Google speech)">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name=".ReminderReceiver"
             android:exported="false" />

@@ -59,6 +59,7 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // Quick access
+        b.btnAssistant.setOnClickListener { Assistant.openSettings(this) }
         b.btnWidget.setOnClickListener { addWidget() }
         b.btnTile.setOnClickListener { addTile() }
 
@@ -82,6 +83,7 @@ class SettingsActivity : AppCompatActivity() {
         super.onResume()
         renderMemory()
         renderPermissions()
+        renderAssistant()
         if (pendingUpdateAfterPermission && Updater.canInstall(this)) {
             pendingUpdateAfterPermission = false
             startUpdate()
@@ -193,6 +195,12 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     // ---------------------------------------------------------------- quick access
+
+    private fun renderAssistant() {
+        val on = Assistant.isDefault(this)
+        b.assistStatus.text = if (on) "Nova is your phone's assistant ✓" else "Not set up yet"
+        b.btnAssistant.text = if (on) "Change assistant settings" else "Make Nova my assistant"
+    }
 
     private fun addWidget() {
         val awm = getSystemService(AppWidgetManager::class.java)

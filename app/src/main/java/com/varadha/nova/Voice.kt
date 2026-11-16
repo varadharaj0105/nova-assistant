@@ -29,7 +29,10 @@ class Listener(private val c: Context, private val events: Events) {
 
     fun start(language: String) {
         stop()
-        val r = SpeechRecognizer.createSpeechRecognizer(c)
+        // Use Google's recogniser directly (when Nova is the phone's assistant, the default points back at Nova).
+        val google = Assistant.googleRecognizer(c)
+        val r = if (google != null) SpeechRecognizer.createSpeechRecognizer(c, google)
+        else SpeechRecognizer.createSpeechRecognizer(c)
         recognizer = r
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {

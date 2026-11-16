@@ -1,6 +1,7 @@
 package com.varadha.nova
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -62,6 +63,7 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
         b.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         b.btnAddKey.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         b.btnNewChat.setOnClickListener { newConversation() }
+        b.btnPowerSetup.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         b.inputLayout.setEndIconOnClickListener { sendTyped() }
         b.input.setOnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_SEND) sendTyped().let { true } else false
@@ -95,6 +97,11 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
 
     /** Opened from the widget, tile, shortcut or assist gesture: start listening right away. */
     private fun handleLaunch(i: Intent?) {
+        if (i?.getBooleanExtra(EXTRA_FROM_ASSIST, false) == true || i?.action == Intent.ACTION_ASSIST) {
+            // Opened with the power button: show over the lock screen and wake the display.
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
         if (i?.action == ACTION_LISTEN || i?.action == Intent.ACTION_ASSIST || i?.getBooleanExtra(EXTRA_LISTEN, false) == true) {
             b.root.post { startListening() }
         }
@@ -106,6 +113,8 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
         b.hello.text = if (name.isBlank()) "Hi there" else "Hi $name"
         b.title.text = Prefs.assistantName(this)
         b.keyCard.visibility = if (Prefs.apiKey(this).isBlank()) View.VISIBLE else View.GONE
+        b.powerCard.visibility =
+            if (Prefs.apiKey(this).isNotBlank() && !Assistant.isDefault(this)) View.VISIBLE else View.GONE
         updateWelcome()
     }
 
@@ -259,6 +268,16 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
 
     override fun launch(intent: Intent): Boolean = onMain {
         try {
+            val km = getSystemService(KeyguardManager::class.java)
+            if (km.isKeyguardLocked) {
+                // Opened from the lock screen: ask to unlock, then do it.
+                km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+                    override fun onDismissSucceeded() {
+                        runCatching { startActivity(intent) }
+                    }
+                })
+                return@onMain true
+            }
             startActivity(intent)
             true
         } catch (e: ActivityNotFoundException) {
@@ -326,5 +345,6 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     companion object {
         const val ACTION_LISTEN = "com.varadha.nova.LISTEN"
         const val EXTRA_LISTEN = "listen"
+        const val EXTRA_FROM_ASSIST = "from_assist"
     }
 }
