@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the app icon → "Talk to Nova" -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_mic"
+        android:shortcutId="talk"
+        android:shortcutLongLabel="@string/shortcut_talk"
+        android:shortcutShortLabel="@string/shortcut_talk">
+        <intent
+            android:action="com.varadha.nova.LISTEN"
+            android:targetClass="com.varadha.nova.MainActivity"
+            android:targetPackage="com.varadha.nova" />
+    </shortcut>
+</shortcuts>
