@@ -49,6 +49,13 @@ jobs:
             gradle connectedDebugAndroidTest --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true || true
             adb exec-out run-as com.varadha.nova tar c -C files shots > shots.tar
             mkdir -p out && tar xf shots.tar -C out && ls -la out/shots
+            adb shell pm grant com.varadha.nova android.permission.RECORD_AUDIO
+            adb shell cmd role add-role-holder android.app.role.ASSISTANT com.varadha.nova 0
+            adb shell cmd role get-role-holders android.app.role.ASSISTANT
+            adb shell input keyevent KEYCODE_HOME && sleep 3
+            adb shell input keyevent KEYCODE_ASSIST && sleep 5
+            adb exec-out screencap -p > out/shots/z_assist_key.png
+            adb shell dumpsys activity activities | grep -m3 -i "mResumedActivity\|topResumedActivity" || true
 
       - name: Publish screenshots
         uses: softprops/action-gh-release@v2
