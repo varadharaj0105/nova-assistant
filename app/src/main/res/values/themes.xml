@@ -46,6 +46,11 @@
         <item name="cornerSizeBottomRight">20dp</item>
     </style>
 
+    <style name="Circle">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
     <style name="TopRounded">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSizeTopLeft">28dp</item>

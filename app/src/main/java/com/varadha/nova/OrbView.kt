@@ -11,7 +11,6 @@ import android.graphics.SweepGradient
 import android.util.AttributeSet
 import android.view.View
 import android.view.animation.LinearInterpolator
-import com.google.android.material.color.MaterialColors
 import kotlin.math.min
 
 /** Nova's "face": a soft colourful orb that swirls while listening or thinking. */
@@ -54,17 +53,17 @@ class OrbView @JvmOverloads constructor(
         invalidate()
     }
 
-    private fun color(attr: Int) = MaterialColors.getColor(this, attr, Color.MAGENTA)
-
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         val cx = w / 2f
         val cy = h / 2f
-        val p = color(com.google.android.material.R.attr.colorPrimary)
-        val t = color(com.google.android.material.R.attr.colorTertiary)
-        val s = color(com.google.android.material.R.attr.colorSecondary)
-        ring.shader = SweepGradient(cx, cy, intArrayOf(p, t, s, p), null)
-        glow.shader = RadialGradient(cx, cy, min(w, h) / 2f, intArrayOf(withAlpha(p, 90), withAlpha(p, 0)), null, Shader.TileMode.CLAMP)
+        // Nova's own vivid colours (not the theme's, which can be very muted).
+        val p = Color.parseColor("#7C5CFF")
+        val pink = Color.parseColor("#FF5CA8")
+        val cyan = Color.parseColor("#3CC8FF")
+        val violet = Color.parseColor("#B44CFF")
+        ring.shader = SweepGradient(cx, cy, intArrayOf(p, pink, violet, cyan, p), null)
+        glow.shader = RadialGradient(cx, cy, min(w, h) / 2f, intArrayOf(withAlpha(p, 110), withAlpha(p, 0)), null, Shader.TileMode.CLAMP)
         core.shader = RadialGradient(cx, cy * 0.85f, min(w, h) / 2.2f, intArrayOf(withAlpha(Color.WHITE, 170), withAlpha(Color.WHITE, 0)), null, Shader.TileMode.CLAMP)
     }
 

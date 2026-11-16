@@ -255,6 +255,7 @@
                         android:contentDescription="Talk"
                         app:elevation="0dp"
                         app:fabCustomSize="58dp"
+                        app:shapeAppearanceOverlay="@style/Circle"
                         app:srcCompat="@drawable/ic_mic" />
                 </FrameLayout>
             </LinearLayout>
