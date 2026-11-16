@@ -12,6 +12,9 @@ import java.util.Locale
 
 /** Listening: turns speech into text, with live partial results. */
 class Listener(private val c: Context, private val events: Events) {
+    private val main = android.os.Handler(android.os.Looper.getMainLooper())
+    @Suppress("UnusedReceiverParameter")
+    private fun SpeechRecognizer.handler() = main
 
     interface Events {
         fun onListening()
@@ -27,7 +30,7 @@ class Listener(private val c: Context, private val events: Events) {
 
     val available get() = SpeechRecognizer.isRecognitionAvailable(c)
 
-    fun start(language: String) {
+    fun start(language: String?) {
         stop()
         // Use Google's recogniser directly (when Nova is the phone's assistant, the default points back at Nova).
         val google = Assistant.googleRecognizer(c)
@@ -55,6 +58,11 @@ class Listener(private val c: Context, private val events: Events) {
 
             override fun onError(error: Int) {
                 active = false
+                // Language not available on this phone's speech engine: retry once in the phone's own language.
+                if ((error == 12 || error == 13) && language != null) {
+                    r.handler().post { start(null) }
+                    return
+                }
                 events.onListenError(
                     when (error) {
                         SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Didn't catch that"
@@ -74,7 +82,7 @@ class Listener(private val c: Context, private val events: Events) {
         r.startListening(
             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
+                .apply { if (language != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, language) }
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         )
