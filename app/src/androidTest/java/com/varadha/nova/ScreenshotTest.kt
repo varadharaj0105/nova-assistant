@@ -42,6 +42,8 @@ class ScreenshotTest {
             shot("${theme}_01_welcome")
             sc.onActivity { it.demo() }
             shot("${theme}_02_chat")
+            sc.onActivity { it.demoListening("Amma ku call pannu") }
+            shot("${theme}_05_listening")
         }
         Prefs.setApiKey(ctx, "test-key")
         Prefs.setModel(ctx, "gemini-flash-latest")

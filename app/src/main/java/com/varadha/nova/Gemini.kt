@@ -18,20 +18,23 @@ object Gemini {
      * Asks Google which models this key can use and picks the best free "Flash" model.
      * Google renames models often, so this is never hard-coded.
      */
-    fun pickModel(key: String, avoid: Set<String> = emptySet()): String {
+    fun pickModel(key: String, avoid: Set<String> = emptySet()): String =
+        models(key).firstOrNull { it !in avoid }
+            ?: throw ApiError("No working Gemini model found for this key", 404)
+
+    /** Chat-capable Flash models for this key, best first. */
+    fun models(key: String): List<String> {
         val json = request("GET", "$BASE/models?pageSize=200", key, null)
         val models = json.optJSONArray("models") ?: JSONArray()
-        val usable = (0 until models.length()).mapNotNull { i ->
+        return (0 until models.length()).mapNotNull { i ->
             val m = models.getJSONObject(i)
             val methods = m.optJSONArray("supportedGenerationMethods")?.toString().orEmpty()
             if (!methods.contains("generateContent")) return@mapNotNull null
             m.optString("name").removePrefix("models/")
-        }.filter { it !in avoid }
-        return usable.maxByOrNull { score(it) }?.takeIf { score(it) > 0 }
-            ?: throw ApiError("No suitable Gemini model found for this key", 404)
+        }.filter { score(it) > 0 }.sortedByDescending { score(it) }
     }
 
-    /** Higher = better: newest Flash, stable before preview, full Flash before Lite. */
+    /** Higher = better: stable before preview (previews can be flaky on the free tier), newest, full Flash before Lite. */
     private fun score(name: String): Double {
         if (!name.startsWith("gemini-") || !name.contains("flash")) return 0.0
         val skip = listOf("image", "tts", "audio", "live", "embedding", "robotics", "computer", "native", "thinking")
@@ -39,7 +42,7 @@ object Gemini {
         val version = Regex("gemini-(\\d+(?:\\.\\d+)?)").find(name)?.groupValues?.get(1)?.toDoubleOrNull() ?: 1.0
         var s = version * 10
         if (name.contains("lite")) s -= 3
-        if (name.contains("preview") || name.contains("exp")) s -= 1.5
+        if (name.contains("preview") || name.contains("exp")) s -= 40
         if (Regex("-\\d{2}-\\d{2}|-\\d{3}$").containsMatchIn(name)) s -= 0.5 // dated snapshots
         return s
     }
@@ -50,7 +53,7 @@ object Gemini {
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", system))))
             .put("contents", contents)
             .put("tools", tools)
-            .put("generationConfig", JSONObject().put("temperature", 0.6).put("maxOutputTokens", 1024))
+            .put("generationConfig", JSONObject().put("temperature", 0.6).put("maxOutputTokens", 2048))
         val json = request("POST", "$BASE/models/$model:generateContent", key, body)
         val cand = json.optJSONArray("candidates")?.optJSONObject(0)
             ?: throw ApiError(blockReason(json), 400)
@@ -89,11 +92,14 @@ object Gemini {
         }
     }
 
-    private fun friendly(code: Int, msg: String) = when (code) {
-        400 -> if (msg.contains("API key", true)) "That API key isn't valid. Check it in Settings." else msg
-        401, 403 -> "Your API key was refused. Check it in Settings."
-        429 -> "Free limit reached for now. Try again in a minute."
-        in 500..599 -> "Gemini is having trouble right now. Try again."
-        else -> msg
+    private fun friendly(code: Int, msg: String): String {
+        val detail = msg.take(140)
+        return when (code) {
+            400 -> if (msg.contains("API key", true)) "That API key isn't valid. Check it in Settings." else "Gemini error: $detail"
+            401, 403 -> "Your API key was refused. Check it in Settings."
+            429 -> "Free limit reached for now. Try again in a minute. ($detail)"
+            in 500..599 -> "Gemini is busy right now ($code). $detail"
+            else -> "Gemini error $code: $detail"
+        }
     }
 }

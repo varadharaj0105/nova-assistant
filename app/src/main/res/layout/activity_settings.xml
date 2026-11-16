@@ -79,6 +79,13 @@
                             android:layout_height="wrap_content"
                             android:text="Get a free key" />
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnModel"
+                            style="@style/Widget.Material3.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Model" />
+
                         <View
                             android:layout_width="0dp"
                             android:layout_height="1dp"

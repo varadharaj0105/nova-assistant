@@ -13,8 +13,13 @@ import android.view.inputmethod.EditorInfo
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.android.material.chip.Chip
-import com.google.android.material.color.DynamicColors
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import android.view.LayoutInflater
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
+import java.util.Calendar
 import com.google.android.material.snackbar.Snackbar
 import com.varadha.nova.databinding.ActivityMainBinding
 import java.util.concurrent.Executors
@@ -46,7 +51,6 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
@@ -59,31 +63,28 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
         b.chat.layoutManager = LinearLayoutManager(this).apply { stackFromEnd = true }
         b.chat.adapter = chat
 
-        b.mic.setOnClickListener { if (listener.active) listener.stop().also { setIdle() } else startListening() }
+        b.mic.setOnClickListener {
+            if (listener.active) {
+                listener.stop()
+                resetMic()
+                setIdle()
+            } else startListening()
+        }
         b.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         b.btnAddKey.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         b.btnNewChat.setOnClickListener { newConversation() }
         b.btnPowerSetup.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
-        b.inputLayout.setEndIconOnClickListener { sendTyped() }
+        b.btnSend.setOnClickListener { sendTyped() }
+        b.listenOverlay.setOnClickListener {
+            listener.stop()
+            resetMic()
+            setIdle()
+        }
         b.input.setOnEditorActionListener { _, id, _ ->
             if (id == EditorInfo.IME_ACTION_SEND) sendTyped().let { true } else false
         }
 
-        listOf(
-            "Set an alarm for 6:30 AM",
-            "Remind me in 10 minutes to drink water",
-            "Call Amma",
-            "Turn on the torch",
-            "Play Ilaiyaraaja songs on YouTube",
-            "Navigate to the nearest petrol bunk",
-            "What's 18% GST on 4500?",
-            "Remember my UPI is varadha@okaxis"
-        ).forEach { s ->
-            b.suggestions.addView(Chip(this).apply {
-                text = s
-                setOnClickListener { send(s, voice = false) }
-            })
-        }
+        buildSuggestions()
 
         Updater.check(this) { b.status.text = "Update ${it.versionText} available · tap" ; b.status.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) } }
 
@@ -110,7 +111,10 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     override fun onResume() {
         super.onResume()
         val name = Prefs.userName(this)
-        b.hello.text = if (name.isBlank()) "Hi there" else "Hi $name"
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val part = when (hour) { in 5..11 -> "Good morning"; in 12..16 -> "Good afternoon"; else -> "Good evening" }
+        b.hello.text = if (name.isBlank()) part else "$part,\n$name"
+        b.hello.post { gradientText(b.hello) }
         b.title.text = Prefs.assistantName(this)
         b.keyCard.visibility = if (Prefs.apiKey(this).isBlank()) View.VISIBLE else View.GONE
         b.powerCard.visibility =
@@ -144,10 +148,13 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
             return
         }
         speaker.stop()
-        b.partial.text = "Listening…"
-        b.partial.visibility = View.VISIBLE
+        b.listenText.text = "Listening…"
+        b.listenOverlay.alpha = 0f
+        b.listenOverlay.visibility = View.VISIBLE
+        b.listenOverlay.animate().alpha(1f).setDuration(180).start()
+        b.orbListen.active = true
         setStatus("Listening…", active = true)
-        b.mic.setImageResource(R.drawable.ic_stop)
+        b.micIcon.setImageResource(R.drawable.ic_stop)
         listener.start(Prefs.listenLang(this))
     }
 
@@ -156,6 +163,7 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     override fun onLevel(level: Float) {
         b.orbSmall.setLevel(level)
         b.orbBig.setLevel(level)
+        b.orbListen.setLevel(level)
         b.pulse.alpha = 0.15f + 0.35f * level
         val s = 1f + 0.25f * level
         b.pulse.scaleX = s
@@ -163,7 +171,7 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     }
 
     override fun onPartial(text: String) {
-        b.partial.text = text
+        b.listenText.text = text
     }
 
     override fun onFinal(text: String) {
@@ -178,9 +186,50 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     }
 
     private fun resetMic() {
-        b.partial.visibility = View.GONE
-        b.mic.setImageResource(R.drawable.ic_mic)
+        b.listenOverlay.visibility = View.GONE
+        b.orbListen.active = false
+        b.micIcon.setImageResource(R.drawable.ic_mic)
         b.pulse.alpha = 0f
+    }
+
+    /** "Try asking" cards, two per row. */
+    private fun buildSuggestions() {
+        val items = listOf(
+            R.drawable.ic_alarm to "Wake me up at 6:30",
+            R.drawable.ic_reminder to "Remind me in 10 minutes to drink water",
+            R.drawable.ic_call to "Amma ku call pannu",
+            R.drawable.ic_flashlight to "Turn on the torch",
+            R.drawable.ic_play to "Play Ilaiyaraaja songs",
+            R.drawable.ic_navigation to "Navigate to the nearest petrol bunk",
+            R.drawable.ic_memory to "Explain normalisation simply",
+            R.drawable.ic_rupee to "What's 18% GST on 4500?"
+        )
+        val tints = intArrayOf(0xFFB39DFF.toInt(), 0xFFF59BD3.toInt(), 0xFF7DD8FF.toInt(), 0xFFFFC27A.toInt())
+        b.suggestions.removeAllViews()
+        items.chunked(2).forEachIndexed { row, pair ->
+            val line = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            pair.forEachIndexed { col, (icon, text) ->
+                val card = LayoutInflater.from(this).inflate(R.layout.item_suggestion, line, false)
+                card.findViewById<ImageView>(R.id.icon).apply {
+                    setImageResource(icon)
+                    setColorFilter(tints[(row * 2 + col) % tints.size])
+                }
+                card.findViewById<TextView>(R.id.label).text = text
+                card.setOnClickListener { send(text, voice = false) }
+                line.addView(card)
+            }
+            b.suggestions.addView(line)
+        }
+    }
+
+    /** Violet → pink gradient on the greeting. */
+    private fun gradientText(t: TextView) {
+        val w = t.paint.measureText(t.text.toString().lines().maxByOrNull { it.length }.orEmpty())
+        if (w <= 0f) return
+        val start = (t.width - w) / 2f
+        t.paint.shader = LinearGradient(start, 0f, start + w, 0f,
+            intArrayOf(0xFFB39DFF.toInt(), 0xFFF59BD3.toInt(), 0xFF7DD8FF.toInt()), null, Shader.TileMode.CLAMP)
+        t.invalidate()
     }
 
     private fun sendTyped() {
@@ -217,6 +266,14 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
             setStatus("Speaking…", active = true)
             speaker.say(reply)
         } else setIdle()
+    }
+
+    /** Screenshot test only: shows the listening view with some words. */
+    fun demoListening(words: String) {
+        b.listenText.text = words
+        b.listenOverlay.visibility = View.VISIBLE
+        b.orbListen.active = true
+        b.orbListen.setLevel(0.7f)
     }
 
     /** Screenshot test only: shows a sample conversation without calling Gemini. */
@@ -340,7 +397,7 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     }
 
     private fun snack(text: String) =
-        Snackbar.make(b.root, text, Snackbar.LENGTH_SHORT).setAnchorView(b.mic).show()
+        Snackbar.make(b.root, text, Snackbar.LENGTH_SHORT).setAnchorView(b.inputRow).show()
 
     companion object {
         const val ACTION_LISTEN = "com.varadha.nova.LISTEN"

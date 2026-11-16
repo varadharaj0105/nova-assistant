@@ -18,7 +18,6 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
-import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.varadha.nova.databinding.ActivitySettingsBinding
@@ -32,7 +31,6 @@ class SettingsActivity : AppCompatActivity() {
     private val ask = registerForActivityResult(ActivityResultContracts.RequestPermission()) { renderPermissions() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        DynamicColors.applyToActivityIfAvailable(this)
         super.onCreate(savedInstanceState)
         b = ActivitySettingsBinding.inflate(layoutInflater)
         setContentView(b.root)
@@ -45,6 +43,7 @@ class SettingsActivity : AppCompatActivity() {
             open(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/apikey")))
         }
         b.btnSaveKey.setOnClickListener { saveAndTestKey() }
+        b.btnModel.setOnClickListener { chooseModel() }
 
         // Personal
         b.userName.setText(Prefs.userName(this))
@@ -84,6 +83,7 @@ class SettingsActivity : AppCompatActivity() {
         renderMemory()
         renderPermissions()
         renderAssistant()
+        renderKeyStatus()
         if (pendingUpdateAfterPermission && Updater.canInstall(this)) {
             pendingUpdateAfterPermission = false
             startUpdate()
@@ -105,11 +105,40 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun renderKeyStatus() {
         val model = Prefs.model(this)
-        b.keyStatus.text = when {
+        val status = when {
             Prefs.apiKey(this).isBlank() -> "Get a free key from Google AI Studio, paste it here, then tap Save & test."
             model != null -> "Connected · using $model"
             else -> "Saved · not tested yet"
         }
+        val err = Prefs.lastError(this)
+        b.keyStatus.text = if (err != null && Prefs.apiKey(this).isNotBlank()) "$status\nLast problem: $err" else status
+    }
+
+    /** Lets you pick which free Gemini model Nova uses. */
+    private fun chooseModel() {
+        val key = Prefs.apiKey(this)
+        if (key.isBlank()) return snack("Add your key first")
+        b.keyStatus.text = "Loading models…"
+        Thread {
+            val list = runCatching { Gemini.models(key) }
+            runOnUiThread {
+                renderKeyStatus()
+                list.onSuccess { models ->
+                    if (models.isEmpty()) return@onSuccess snack("No models available for this key")
+                    val current = models.indexOf(Prefs.model(this)).coerceAtLeast(0)
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Gemini model")
+                        .setSingleChoiceItems(models.toTypedArray(), current) { d, which ->
+                            Prefs.setModel(this, models[which])
+                            Prefs.setLastError(this, null)
+                            renderKeyStatus()
+                            d.dismiss()
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                }.onFailure { snack(it.message ?: "Couldn't load models") }
+            }
+        }.start()
     }
 
     private fun saveAndTestKey() {

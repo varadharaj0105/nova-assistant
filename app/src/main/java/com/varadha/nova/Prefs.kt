@@ -26,6 +26,10 @@ object Prefs {
     fun model(c: Context) = prefs(c).getString(K_MODEL, null)
     fun setModel(c: Context, m: String?) = prefs(c).edit().putString(K_MODEL, m).apply()
 
+    /** Last error from Gemini (shown in Settings to help fix problems). */
+    fun lastError(c: Context) = prefs(c).getString("last_error", null)
+    fun setLastError(c: Context, e: String?) = prefs(c).edit().putString("last_error", e).apply()
+
     fun voiceReplies(c: Context) = prefs(c).getBoolean(K_VOICE, true)
     fun setVoiceReplies(c: Context, on: Boolean) = prefs(c).edit().putBoolean(K_VOICE, on).apply()
 

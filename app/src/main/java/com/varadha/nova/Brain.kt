@@ -25,7 +25,10 @@ class Brain(private val c: Context, private val tools: Tools) {
     fun ask(text: String): String = synchronized(history) {
         val key = Prefs.apiKey(c)
         if (key.isBlank()) return "Add your free Gemini API key in Settings first."
-        val model = Prefs.model(c) ?: Gemini.pickModel(key).also { Prefs.setModel(c, it) }
+        val saved = Prefs.model(c)
+        // Older versions could pick a "preview" model, which is often busy on the free tier: re-pick.
+        val model = if (saved == null || saved.contains("preview") || saved.contains("exp"))
+            Gemini.pickModel(key).also { Prefs.setModel(c, it) } else saved
 
         history += JSONObject().put("role", "user")
             .put("parts", JSONArray().put(JSONObject().put("text", text)))
@@ -74,14 +77,33 @@ class Brain(private val c: Context, private val tools: Tools) {
         }
     }
 
-    /** Calls Gemini; if the saved model has disappeared, picks a new one once. */
-    private fun callModel(key: String, model: String): JSONObject = try {
-        Gemini.generate(key, model, systemPrompt(), JSONArray(history), tools.declarations)
-    } catch (e: Gemini.ApiError) {
-        if (e.code != 404) throw e
-        val next = Gemini.pickModel(key, avoid = setOf(model))
-        Prefs.setModel(c, next)
-        Gemini.generate(key, next, systemPrompt(), JSONArray(history), tools.declarations)
+    /**
+     * Calls Gemini. If Google is busy (5xx) it retries once; if the model is overloaded, out of
+     * free quota (429) or gone (404), it switches to the next-best free model and remembers it.
+     */
+    private fun callModel(key: String, model: String): JSONObject {
+        var current = model
+        val tried = mutableSetOf<String>()
+        var last: Gemini.ApiError? = null
+        repeat(4) { attempt ->
+            try {
+                val result = Gemini.generate(key, current, systemPrompt(), JSONArray(history), tools.declarations)
+                if (current != Prefs.model(c)) Prefs.setModel(c, current)
+                Prefs.setLastError(c, null)
+                return result
+            } catch (e: Gemini.ApiError) {
+                last = e
+                Prefs.setLastError(c, "$current: ${e.message}")
+                if (e.code !in RETRYABLE) throw e
+                if (attempt == 0 && e.code >= 500) {
+                    Thread.sleep(1200) // short hiccup: same model once more
+                    return@repeat
+                }
+                tried += current
+                current = runCatching { Gemini.pickModel(key, avoid = tried) }.getOrElse { throw e }
+            }
+        }
+        throw last ?: Gemini.ApiError("Gemini didn't answer", 500)
     }
 
     private fun isUserText(o: JSONObject): Boolean {
@@ -140,5 +162,6 @@ class Brain(private val c: Context, private val tools: Tools) {
     companion object {
         private const val MAX_STEPS = 5
         private const val MAX_HISTORY = 24
+        private val RETRYABLE = setOf(404, 429, 500, 502, 503, 504)
     }
 }

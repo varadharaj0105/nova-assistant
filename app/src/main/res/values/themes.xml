@@ -1,15 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="icon_bg">#1C1B2E</color>
-    <color name="seed">#6D5DE8</color>
+    <color name="icon_bg">#0B0918</color>
+    <color name="night">#0B0918</color>
+    <color name="violet">#8B6CFF</color>
+    <color name="pink">#E255C0</color>
+    <color name="cyan">#3CC8FF</color>
 
-    <!-- Material 3; on Android 12+ colours follow the phone's theme (Material You). -->
-    <style name="Theme.Nova" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/seed</item>
+    <!-- Nova's own look: deep night background with violet/pink accents (same in light and dark mode). -->
+    <style name="Theme.Nova" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#B39DFF</item>
+        <item name="colorOnPrimary">#1E1238</item>
+        <item name="colorPrimaryContainer">#2E2160</item>
+        <item name="colorOnPrimaryContainer">#ECE4FF</item>
+        <item name="colorSecondary">#F59BD3</item>
+        <item name="colorOnSecondary">#3A0E2C</item>
+        <item name="colorSecondaryContainer">#2A1B44</item>
+        <item name="colorOnSecondaryContainer">#FFE0F2</item>
+        <item name="colorTertiary">#7DD8FF</item>
+        <item name="android:colorBackground">@color/night</item>
+        <item name="colorSurface">@color/night</item>
+        <item name="colorOnSurface">#EEEAFB</item>
+        <item name="colorOnSurfaceVariant">#ABA3C8</item>
+        <item name="colorSurfaceContainerLowest">#08060F</item>
+        <item name="colorSurfaceContainerLow">#120F24</item>
+        <item name="colorSurfaceContainer">#17132D</item>
+        <item name="colorSurfaceContainerHigh">#1E1938</item>
+        <item name="colorSurfaceContainerHighest">#262044</item>
+        <item name="colorOutline">#5A5285</item>
+        <item name="colorOutlineVariant">#2E2752</item>
+        <item name="colorError">#FF8A9A</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
-        <item name="android:windowLightNavigationBar">?attr/isLightTheme</item>
-        <item name="android:navigationBarColor">?attr/colorSurfaceContainer</item>
+        <item name="android:navigationBarColor">@color/night</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <style name="SectionLabel">
@@ -27,35 +50,12 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="cardCornerRadius">24dp</item>
         <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
-    </style>
-
-    <!-- Chat bubbles: rounded with one sharper corner pointing at the speaker -->
-    <style name="BubbleUser">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSizeTopLeft">20dp</item>
-        <item name="cornerSizeTopRight">20dp</item>
-        <item name="cornerSizeBottomLeft">20dp</item>
-        <item name="cornerSizeBottomRight">6dp</item>
-    </style>
-
-    <style name="BubbleNova">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSizeTopLeft">6dp</item>
-        <item name="cornerSizeTopRight">20dp</item>
-        <item name="cornerSizeBottomLeft">20dp</item>
-        <item name="cornerSizeBottomRight">20dp</item>
+        <item name="strokeColor">?attr/colorOutlineVariant</item>
+        <item name="strokeWidth">1dp</item>
     </style>
 
     <style name="Circle">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
-    </style>
-
-    <style name="TopRounded">
-        <item name="cornerFamily">rounded</item>
-        <item name="cornerSizeTopLeft">28dp</item>
-        <item name="cornerSizeTopRight">28dp</item>
-        <item name="cornerSizeBottomLeft">0dp</item>
-        <item name="cornerSizeBottomRight">0dp</item>
     </style>
 </resources>
