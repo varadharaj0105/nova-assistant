@@ -46,6 +46,12 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
         listenWhenAllowed = false
     }
 
+    /** Backup listener: Android's standard "Speak now" voice popup. */
+    private val voicePopup = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        val text = r.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (r.resultCode == RESULT_OK && !text.isNullOrBlank()) send(text, voice = true) else setIdle()
+    }
+
     private val askOther = registerForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) snack("Allowed. Say that again.")
     }
@@ -144,7 +150,7 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
             return
         }
         if (!listener.available) {
-            snack("Speech recognition isn't available. Install or update the Google app.")
+            onNeedFallback("no speech service")
             return
         }
         speaker.stop()
@@ -159,6 +165,22 @@ class MainActivity : AppCompatActivity(), Host, Listener.Events {
     }
 
     override fun onListening() = Unit
+
+    override fun onNeedFallback(reason: String) {
+        Prefs.setLastError(this, "Listening: $reason (used the voice popup instead)")
+        resetMic()
+        setStatus("Listening…", active = true)
+        val i = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, Prefs.listenLang(this))
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to ${Prefs.assistantName(this)}")
+        try {
+            voicePopup.launch(i)
+        } catch (e: ActivityNotFoundException) {
+            setIdle()
+            snack("No voice input app found. Install or update the Google app, or type instead.")
+        }
+    }
 
     override fun onLevel(level: Float) {
         b.orbSmall.setLevel(level)

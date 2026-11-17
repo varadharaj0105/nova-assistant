@@ -22,6 +22,16 @@ class Listener(private val c: Context, private val events: Events) {
         fun onPartial(text: String)
         fun onFinal(text: String)
         fun onListenError(message: String)
+        /** The built-in speech service didn't work on this phone: use the standard voice popup instead. */
+        fun onNeedFallback(reason: String)
+    }
+
+    private var ready = false
+    private val watchdog = Runnable {
+        if (!ready && recognizer != null) {
+            stop()
+            events.onNeedFallback("speech service didn't start")
+        }
     }
 
     private var recognizer: SpeechRecognizer? = null
@@ -32,13 +42,21 @@ class Listener(private val c: Context, private val events: Events) {
 
     fun start(language: String?) {
         stop()
+        ready = false
         // Use Google's recogniser directly (when Nova is the phone's assistant, the default points back at Nova).
         val google = Assistant.googleRecognizer(c)
-        val r = if (google != null) SpeechRecognizer.createSpeechRecognizer(c, google)
-        else SpeechRecognizer.createSpeechRecognizer(c)
+        val r = runCatching {
+            if (google != null) SpeechRecognizer.createSpeechRecognizer(c, google)
+            else SpeechRecognizer.createSpeechRecognizer(c)
+        }.getOrElse {
+            events.onNeedFallback("couldn't create speech service")
+            return
+        }
         recognizer = r
         r.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
+                ready = true
+                main.removeCallbacks(watchdog)
                 active = true
                 events.onListening()
             }
@@ -58,9 +76,16 @@ class Listener(private val c: Context, private val events: Events) {
 
             override fun onError(error: Int) {
                 active = false
+                main.removeCallbacks(watchdog)
                 // Language not available on this phone's speech engine: retry once in the phone's own language.
                 if ((error == 12 || error == 13) && language != null) {
                     r.handler().post { start(null) }
+                    return
+                }
+                // Problems with the speech service itself (not with what you said): use the voice popup.
+                if (error in SERVICE_ERRORS || error == 12 || error == 13) {
+                    stop()
+                    events.onNeedFallback("speech service error $error")
                     return
                 }
                 events.onListenError(
@@ -86,15 +111,25 @@ class Listener(private val c: Context, private val events: Events) {
                 .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         )
+        main.postDelayed(watchdog, 4000)
     }
 
     fun stop() {
+        main.removeCallbacks(watchdog)
         active = false
         recognizer?.run {
             runCatching { cancel() }
             destroy()
         }
         recognizer = null
+    }
+
+    companion object {
+        /** client, server, busy, too many requests, server disconnected */
+        private val SERVICE_ERRORS = setOf(
+            SpeechRecognizer.ERROR_CLIENT, SpeechRecognizer.ERROR_SERVER,
+            SpeechRecognizer.ERROR_RECOGNIZER_BUSY, 10, 11
+        )
     }
 }
 
